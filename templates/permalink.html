@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+{{post.render() | safe}}
+<h4>{{error}}</h4>
+{% for comment in c %}
+{{comment.content}}
+<a href="/blog/{{post.key().id()}}/editComment/{{comment.key().id()}}">edit</a>
+<a href=/blog/{{post.key().id()}}/deleteComment/{{comment.key().id()}}>delete</a>
+<br>
+{% endfor %}
+<form method="post">
+    <label>
+        <div>add comment</div>
+        <textarea name="content"></textarea>
+    </label>
+    <input type="submit" value="comment">
+</form>
+
+<div id="comment">
+</div>
+{% endblock %}
