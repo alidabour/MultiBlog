@@ -230,12 +230,18 @@ class EditComment(BlogHandler):
         if self.user:
             key = db.Key.from_path('Comment', int(comment_id))
             comment = db.get(key)
-            content = self.request.get('content')
-            if content:
-                # update comment content
-                comment.content = content
-                comment.put()
-            self.redirect("/blog/%s" % post_id)
+            if comment.owner == self.user.name:
+                content = self.request.get('content')
+                if content:
+                    # update comment content
+                    comment.content = content
+                    comment.put()
+                self.redirect("/blog/%s" % post_id)
+            else:
+                # redirect to post page .. user can only edit his comment
+                self.redirect(
+                    "/blog/%s" % post_id +
+                    "?error=You are not authorized to edit this comment")
         else:
             # redirect to login page .. public user can not edit comment
             self.redirect("/login")
