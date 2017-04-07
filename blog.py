@@ -26,7 +26,7 @@ def render_str(template, **params):
 def make_secure_val(val):
     """
     create array of value and hash(value)
-    :param val: value to be hashed 
+    :param val: value to be hashed
     :return: value and hash(value)
     """
     return '%s|%s' % (val, hmac.new(secret, val).hexdigest())
@@ -34,7 +34,7 @@ def make_secure_val(val):
 
 def check_secure_val(secure_val):
     """
-    check if the value in secure value has not changed 
+    check if the value in secure value has not changed
     :param secure_val: value and hash(value)
     :return: value
     """
@@ -200,7 +200,8 @@ class PostPage(BlogHandler):
             owner = self.user.name
             if content:
                 # Add comment to datastore
-                c = Comment(content=content, owner=owner, post_reference=post.key())
+                c = Comment(content=content, owner=owner,
+                            post_reference=post.key())
                 c.put()
             self.redirect("/blog/%s" % post_id)
         else:
@@ -209,6 +210,7 @@ class PostPage(BlogHandler):
 
 
 class EditComment(BlogHandler):
+
     def get(self, post_id, comment_id):
         if self.user:
             key = db.Key.from_path('Comment', int(comment_id))
@@ -217,40 +219,49 @@ class EditComment(BlogHandler):
                 self.render("edit-comment.html", c=comment)
             else:
                 # redirect to post page .. user can only edit his comment
-                self.redirect("/blog/%s" % post_id + "?error=You are not authorized to edit this comment")
+                self.redirect(
+                    "/blog/%s" % post_id +
+                    "?error=You are not authorized to edit this comment")
         else:
             # redirect to login page .. public user can not edit comment
             self.redirect("/login")
 
     def post(self, post_id, comment_id):
-        key = db.Key.from_path('Comment', int(comment_id))
-        comment = db.get(key)
-        content = self.request.get('content')
-        if content:
-            # update comment content
-            comment.content = content
-            comment.put()
-        self.redirect("/blog/%s" % post_id)
+        if self.user:
+            key = db.Key.from_path('Comment', int(comment_id))
+            comment = db.get(key)
+            content = self.request.get('content')
+            if content:
+                # update comment content
+                comment.content = content
+                comment.put()
+            self.redirect("/blog/%s" % post_id)
+        else:
+            # redirect to login page .. public user can not edit comment
+            self.redirect("/login")
 
 
 class EditPost(BlogHandler):
+
     def get(self, post_id):
         if self.user:
-            logging.info("Test Edit___________________________________________")
+            logging.info(
+                "Test Edit___________________________________________")
             key = db.Key.from_path('Post', int(post_id), parent=blog_key())
             post = db.get(key)
             if post.owner == self.user.name:
                 self.render("edit.html", post=post)
             else:
                 # redirect to post page .. user can only edit his post
-                self.redirect("/blog/%s" % post_id + "?error=You are not authorized to edit this post")
+                self.redirect("/blog/%s" % post_id +
+                              "?error=You are't authorized to edit this post")
         else:
             # redirect to login page .. public user can not edit posts
             self.redirect("/login")
 
     def post(self, post_id):
         if not self.user:
-            self.redirect('/login')
+            return self.redirect('/login')
 
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(key)
@@ -269,7 +280,8 @@ class EditPost(BlogHandler):
                 self.render("edit.html", post=post, error=error)
         else:
             # redirect to login page .. public user can not edit comment
-            self.render("edit.html", post=post, error="You are not authorized to edit this post")
+            self.render("edit.html", post=post,
+                        error="You are not authorized to edit this post")
 
 
 class DeleteComment(BlogHandler):
@@ -284,24 +296,29 @@ class DeleteComment(BlogHandler):
             else:
                 # redirect to post page .. user can only delete his comments
                 self.redirect("/blog/%s" % post_id +
-                              "?error=You are not authorized to delete this comment")
+                              "?error=You are't authorized to delete comment")
         else:
             # redirect to login page ..public user can not delete any comments
             self.redirect("/login")
 
     def post(self, post_id, comment_id):
-        key = db.Key.from_path('Comment', int(comment_id))
-        comment = db.get(key)
-        if comment.owner == self.user.name:
-            comment.delete()
-            self.redirect("/blog/%s" % post_id)
+        if self.user:
+            key = db.Key.from_path('Comment', int(comment_id))
+            comment = db.get(key)
+            if comment.owner == self.user.name:
+                comment.delete()
+                self.redirect("/blog/%s" % post_id)
+            else:
+                # redirect to post page .. user can only delete his comments
+                self.redirect("/blog/%s" % post_id +
+                              "?error=You are't authorized to delete comment")
         else:
-            # redirect to post page .. user can only delete his comments
-            self.redirect("/blog/%s" % post_id +
-                          "?error=You are not authorized to delete this comment")
+            # redirect to login page ..public user can not delete any comments
+            self.redirect("/login")
 
 
 class DeletePost(BlogHandler):
+
     def get(self, post_id):
         if self.user:
             logging.info("user ___________________________________________")
@@ -312,24 +329,29 @@ class DeletePost(BlogHandler):
             else:
                 # redirect to post page .. user can only delete his posts
                 self.redirect("/blog/%s" % post_id +
-                              "?error=You are not authorized to delete this post")
+                              "?error=You are't authorized to delete post")
         else:
             # redirect to login page ..public user can not delete any posts
             self.redirect("/login")
 
     def post(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-        if self.user.name == post.owner:
-            post.delete()
-            self.redirect("/blog")
+        if self.user:
+            key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+            post = db.get(key)
+            if self.user.name == post.owner:
+                post.delete()
+                self.redirect("/blog")
+            else:
+                # redirect to post page .. user can only delete his posts
+                self.render("delete.html",
+                            error="You are not authorized to delete this post")
         else:
-            # redirect to post page .. user can only delete his posts
-            self.render("delete.html",
-                        error="You are not authorized to delete this post")
+            # redirect to login page ..public user can not delete any posts
+            self.redirect("/login")
 
 
 class LikePost(BlogHandler):
+
     def get(self, post_id):
         if self.user:
             logging.info("Like --------------------------------------------")
@@ -354,6 +376,7 @@ class LikePost(BlogHandler):
 
 
 class NewPost(BlogHandler):
+
     def get(self):
         if self.user:
             self.render("newpost.html")
@@ -363,18 +386,20 @@ class NewPost(BlogHandler):
 
     def post(self):
         if not self.user:
-            self.redirect('/blog')
+            return self.redirect('/blog')
         subject = self.request.get('subject')
         content = self.request.get('content')
         owner = self.user.name
         if subject and content and owner:
             # create and add new post to datastore
-            p = Post(parent=blog_key(), subject=subject, content=content, owner=owner)
+            p = Post(parent=blog_key(), subject=subject,
+                     content=content, owner=owner)
             p.put()
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error = "subject and content, please!"
-            self.render("newpost.html", subject=subject, content=content, owner=owner, error=error)
+            self.render("newpost.html", subject=subject,
+                        content=content, owner=owner, error=error)
 
 
 # regular expression to make sure that user name is 3 -20 char
@@ -384,8 +409,8 @@ USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 
 def valid_username(username):
     """
-    Test user name match rule of username regular expression or not    
-    :param username: 
+    Test user name match rule of username regular expression or not
+    :param username:
     :return: boolen true if match , else false
     """
     return username and USER_RE.match(username)
@@ -406,6 +431,7 @@ def valid_email(email):
 
 
 class Signup(BlogHandler):
+
     def get(self):
         self.render("signup-form.html")
 
@@ -444,6 +470,7 @@ class Signup(BlogHandler):
 
 
 class Register(Signup):
+
     def done(self):
         # make sure the user doesn't already exist
         u = User.by_name(self.username)
@@ -458,6 +485,7 @@ class Register(Signup):
 
 
 class Login(BlogHandler):
+
     def get(self):
         self.render('login-form.html')
 
@@ -475,6 +503,7 @@ class Login(BlogHandler):
 
 
 class Logout(BlogHandler):
+
     def get(self):
         self.logout()
         self.redirect('/signup')
@@ -484,8 +513,10 @@ app = webapp2.WSGIApplication([('/', BlogFront),
                                ('/edit/([0-9]+)', EditPost),
                                ('/delete/([0-9]+)', DeletePost),
                                ('/like/([0-9]+)', LikePost),
-                               ('/blog/([0-9]+)/editComment/([0-9]+)', EditComment),
-                               ('/blog/([0-9]+)/deleteComment/([0-9]+)', DeleteComment),
+                               ('/blog/([0-9]+)/editComment/([0-9]+)',
+                                EditComment),
+                               ('/blog/([0-9]+)/deleteComment/([0-9]+)',
+                                DeleteComment),
                                ('/blog/?', BlogFront),
                                ('/blog/([0-9]+)', PostPage),
                                ('/blog/newpost', NewPost),
