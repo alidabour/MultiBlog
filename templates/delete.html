@@ -1,16 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
-<h2>Are you sure you want to delete?</h2>
-<form method="post">
-      <input type="submit" value="delete">
-    </form>
-    <div >{{error}}</div>
-<a href="/blog/{{post_id}}">Cancel</a>
+{% extends "base.html" %}
+{% block content %}
 
-</body>
-</html>
+    <h2>Are you sure you want to delete?</h2>
+    <form method="post">
+        <input type="submit" value="delete">
+    </form>
+    <div>{{ error }}</div>
+    <a href="/blog/{{ post_id }}">Cancel</a>
+
+{% endblock %}

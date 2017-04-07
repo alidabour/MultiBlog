@@ -10,6 +10,7 @@ import jinja2
 
 from google.appengine.ext import db
 
+# connect jinja to html template folder
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir),
                                autoescape=True)
@@ -23,16 +24,31 @@ def render_str(template, **params):
 
 
 def make_secure_val(val):
+    """
+    create array of value and hash(value)
+    :param val: value to be hashed 
+    :return: value and hash(value)
+    """
     return '%s|%s' % (val, hmac.new(secret, val).hexdigest())
 
 
 def check_secure_val(secure_val):
+    """
+    check if the value in secure value has not changed 
+    :param secure_val: value and hash(value)
+    :return: value
+    """
     val = secure_val.split('|')[0]
     if secure_val == make_secure_val(val):
         return val
 
 
 class BlogHandler(webapp2.RequestHandler):
+    """
+    Parent Class for all Website handler classes
+    provide the main functions as write html and cookie process
+    """
+
     def write(self, *a, **kw):
         self.response.out.write(*a, **kw)
 
@@ -65,11 +81,6 @@ class BlogHandler(webapp2.RequestHandler):
         self.user = uid and User.by_id(int(uid))
 
 
-# def render_post(response, post):
-#     response.out.write('<b>' + post.subject + '</b><br>')
-#     response.out.write(post.content)
-
-
 # user stuff
 def make_salt(length=5):
     return ''.join(random.choice(letters) for x in xrange(length))
@@ -98,6 +109,9 @@ def blog_key(name='default'):
 
 # database stuff
 class User(db.Model):
+    """
+    User datastore model
+    """
     name = db.StringProperty(required=True)
     pw_hash = db.StringProperty(required=True)
     email = db.StringProperty()
@@ -127,6 +141,9 @@ class User(db.Model):
 
 
 class Post(db.Model):
+    """
+    Post datastore model
+    """
     subject = db.StringProperty(required=True)
     content = db.TextProperty(required=True)
     created = db.DateTimeProperty(auto_now_add=True)
@@ -140,18 +157,19 @@ class Post(db.Model):
 
 
 class Comment(db.Model):
+    """
+    Comment datastore model
+    """
     content = db.TextProperty(required=True)
     owner = db.StringProperty(required=True)
     created = db.DateTimeProperty(auto_now_add=True)
     last_modified = db.DateTimeProperty(auto_now=True)
     post_reference = db.ReferenceProperty(Post)
 
-    def render(self):
-        self.render_text = self.content.replace('\n', '<br>')
-        return render_str("comment.html", c=self)
-
 
 class BlogFront(BlogHandler):
+    """Display list of post"""
+
     def get(self):
         logging.info("BlogFront___________________")
         posts = Post.all().order('-created')
@@ -159,6 +177,8 @@ class BlogFront(BlogHandler):
 
 
 class PostPage(BlogHandler):
+    """Display blog permalink page"""
+
     def get(self, post_id):
         error = self.request.get('error')
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
@@ -179,10 +199,12 @@ class PostPage(BlogHandler):
             content = self.request.get('content')
             owner = self.user.name
             if content:
+                # Add comment to datastore
                 c = Comment(content=content, owner=owner, post_reference=post.key())
                 c.put()
             self.redirect("/blog/%s" % post_id)
         else:
+            # redirect to login page .. public user can not comment
             self.redirect("/login")
 
 
@@ -194,8 +216,10 @@ class EditComment(BlogHandler):
             if comment.owner == self.user.name:
                 self.render("edit-comment.html", c=comment)
             else:
+                # redirect to post page .. user can only edit his comment
                 self.redirect("/blog/%s" % post_id + "?error=You are not authorized to edit this comment")
         else:
+            # redirect to login page .. public user can not edit comment
             self.redirect("/login")
 
     def post(self, post_id, comment_id):
@@ -203,6 +227,7 @@ class EditComment(BlogHandler):
         comment = db.get(key)
         content = self.request.get('content')
         if content:
+            # update comment content
             comment.content = content
             comment.put()
         self.redirect("/blog/%s" % post_id)
@@ -217,8 +242,10 @@ class EditPost(BlogHandler):
             if post.owner == self.user.name:
                 self.render("edit.html", post=post)
             else:
+                # redirect to post page .. user can only edit his post
                 self.redirect("/blog/%s" % post_id + "?error=You are not authorized to edit this post")
         else:
+            # redirect to login page .. public user can not edit posts
             self.redirect("/login")
 
     def post(self, post_id):
@@ -231,18 +258,23 @@ class EditPost(BlogHandler):
         content = self.request.get('content')
         if self.user.name == post.owner:
             if subject and content:
+                # update post
                 post.subject = subject
                 post.content = content
                 post.put()
                 self.redirect("/blog/%s" % str(post_id))
             else:
+                # if user enter empty subject or content
                 error = "subject and content, please!"
                 self.render("edit.html", post=post, error=error)
         else:
+            # redirect to login page .. public user can not edit comment
             self.render("edit.html", post=post, error="You are not authorized to edit this post")
 
 
 class DeleteComment(BlogHandler):
+    """Display delete confirmation page"""
+
     def get(self, post_id, comment_id):
         if self.user:
             key = db.Key.from_path('Comment', int(comment_id))
@@ -250,9 +282,11 @@ class DeleteComment(BlogHandler):
             if comment.owner == self.user.name:
                 self.render("delete.html", post_id=post_id)
             else:
+                # redirect to post page .. user can only delete his comments
                 self.redirect("/blog/%s" % post_id +
                               "?error=You are not authorized to delete this comment")
         else:
+            # redirect to login page ..public user can not delete any comments
             self.redirect("/login")
 
     def post(self, post_id, comment_id):
@@ -262,6 +296,7 @@ class DeleteComment(BlogHandler):
             comment.delete()
             self.redirect("/blog/%s" % post_id)
         else:
+            # redirect to post page .. user can only delete his comments
             self.redirect("/blog/%s" % post_id +
                           "?error=You are not authorized to delete this comment")
 
@@ -275,9 +310,11 @@ class DeletePost(BlogHandler):
             if post.owner == self.user.name:
                 self.render("delete.html", post_id=post_id)
             else:
+                # redirect to post page .. user can only delete his posts
                 self.redirect("/blog/%s" % post_id +
                               "?error=You are not authorized to delete this post")
         else:
+            # redirect to login page ..public user can not delete any posts
             self.redirect("/login")
 
     def post(self, post_id):
@@ -287,17 +324,9 @@ class DeletePost(BlogHandler):
             post.delete()
             self.redirect("/blog")
         else:
-            # self.render("/delete/%s" % str(post.key().id()))
+            # redirect to post page .. user can only delete his posts
             self.render("delete.html",
                         error="You are not authorized to delete this post")
-
-
-# class NewComment(BlogHandler):
-#     def get(self, post_id):
-#         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-#         post = db.get(key)
-#         logging.info("Like --------------------------------------------")
-#         self.redirect("/login")
 
 
 class LikePost(BlogHandler):
@@ -306,17 +335,21 @@ class LikePost(BlogHandler):
             logging.info("Like --------------------------------------------")
             key = db.Key.from_path('Post', int(post_id), parent=blog_key())
             post = db.get(key)
+            # user can not like his post
             if self.user.name == post.owner:
                 self.redirect("/blog")
+            # if user alerdey like post >> remove like
             elif self.user.name in post.likes:
                 post.likes.remove(self.user.name)
                 post.put()
                 self.redirect("/blog/%s" % post_id)
             else:
+                # add like
                 post.likes.append(self.user.name)
                 post.put()
                 self.redirect("/blog/%s" % post_id)
         else:
+            # public users can not like any post
             self.redirect("/login")
 
 
@@ -325,6 +358,7 @@ class NewPost(BlogHandler):
         if self.user:
             self.render("newpost.html")
         else:
+            # public user  can not add post
             self.redirect("/login")
 
     def post(self):
@@ -334,6 +368,7 @@ class NewPost(BlogHandler):
         content = self.request.get('content')
         owner = self.user.name
         if subject and content and owner:
+            # create and add new post to datastore
             p = Post(parent=blog_key(), subject=subject, content=content, owner=owner)
             p.put()
             self.redirect('/blog/%s' % str(p.key().id()))
@@ -342,10 +377,17 @@ class NewPost(BlogHandler):
             self.render("newpost.html", subject=subject, content=content, owner=owner, error=error)
 
 
+# regular expression to make sure that user name is 3 -20 char
+# and user name is letters and/or numbers
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
 
 
 def valid_username(username):
+    """
+    Test user name match rule of username regular expression or not    
+    :param username: 
+    :return: boolen true if match , else false
+    """
     return username and USER_RE.match(username)
 
 
